@@ -14,32 +14,33 @@ jobs:
     - name: Setup Build Environment
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential bc bison flex libssl-dev make libc6-dev libncurses-dev device-tree-compiler ccache lz4 lzop zip gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi python3 python-is-python3 python2
+        sudo apt-get install -y build-essential bc bison flex libssl-dev make libc6-dev libncurses-dev device-tree-compiler ccache lz4 lzop zip python3 python-is-python3 python2
 
-    - name: Download Proton-Clang Toolchain
+    - name: Download GCC Toolchains
       run: |
-        git clone --depth=1 https://github.com/kdrag0n/proton-clang.git ~/toolchain
+        git clone --depth=1 https://github.com/mvaisakh/gcc-arm64.git ~/gcc64
+        git clone --depth=1 https://github.com/mvaisakh/gcc-arm.git ~/gcc32
 
     - name: Patch Typos and Compile Kernel
       run: |
-        export PATH="$HOME/toolchain/bin:$PATH"
+        export PATH="$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
         
         # 1. Automatically fix the developer's copy-paste typo
         sed -i 's/+static int can_umount/static int can_umount/g' fs/namespace.c
         
-        # 2. Tell the compiler to stop treating minor warnings as fatal errors
-        find . -name "Makefile" -exec sed -i 's/-Werror\b//g' {} +
+        # 2. Fix Ubuntu 22.04 compatibility for older kernels
+        export HOSTCFLAGS="-fcommon"
         
-        # 3. Generate initial config
-        make O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- cactus_defconfig
+        # 3. Setup Config using GCC
+        make O=out ARCH=arm64 CROSS_COMPILE=aarch64-elf- CROSS_COMPILE_ARM32=arm-eabi- cactus_defconfig
         
-        # 4. FORCE DISABLE Stack Protector (Fixes the compiler panic)
+        # 4. FORCE DISABLE Stack Protector
         sed -i 's/CONFIG_CC_STACKPROTECTOR_STRONG=y/# CONFIG_CC_STACKPROTECTOR_STRONG is not set/g' out/.config
         echo "CONFIG_CC_STACKPROTECTOR_NONE=y" >> out/.config
-        make O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- olddefconfig
+        make O=out ARCH=arm64 CROSS_COMPILE=aarch64-elf- CROSS_COMPILE_ARM32=arm-eabi- olddefconfig
         
-        # 5. Start the actual build
-        make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu- KCFLAGS="-Wno-error"
+        # 5. Start the actual build with GCC
+        make -j$(nproc --all) O=out ARCH=arm64 CROSS_COMPILE=aarch64-elf- CROSS_COMPILE_ARM32=arm-eabi-
 
     - name: Upload Kernel Image
       uses: actions/upload-artifact@v4
