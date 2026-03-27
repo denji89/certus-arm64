@@ -30,8 +30,15 @@ jobs:
         # 2. Tell the compiler to stop treating minor warnings as fatal errors
         find . -name "Makefile" -exec sed -i 's/-Werror\b//g' {} +
         
-        # 3. Start the build (strictly enforcing Clang on ALL commands)
+        # 3. Generate initial config
         make O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- cactus_defconfig
+        
+        # 4. FORCE DISABLE Stack Protector (Fixes the compiler panic)
+        sed -i 's/CONFIG_CC_STACKPROTECTOR_STRONG=y/# CONFIG_CC_STACKPROTECTOR_STRONG is not set/g' out/.config
+        echo "CONFIG_CC_STACKPROTECTOR_NONE=y" >> out/.config
+        make O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- olddefconfig
+        
+        # 5. Start the actual build
         make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu- KCFLAGS="-Wno-error"
 
     - name: Upload Kernel Image
