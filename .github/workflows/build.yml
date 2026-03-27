@@ -18,7 +18,7 @@ jobs:
 
     - name: Patch Typos and Compile Kernel
       run: |
-        # 1. Automatically fix the developer's copy-paste typo in namespace.c
+        # 1. Automatically fix the developer's copy-paste typo
         sed -i 's/+static int can_umount/static int can_umount/g' fs/namespace.c
         
         # 2. Fix the duplicate 'static' typo in the CPU frequency drivers
@@ -31,16 +31,21 @@ jobs:
         # 4. Fix Ubuntu 22.04 compatibility for older kernels
         export HOSTCFLAGS="-fcommon"
         
-        # 5. Setup Config using system GCC
+        # 5. Create Dummy KSU Hooks to satisfy the Linker (The Bypass)
+        echo "int ksu_input_hook() { return 0; }" > drivers/ksu_stub.c
+        echo "int ksu_vfs_read_hook() { return 0; }" >> drivers/ksu_stub.c
+        echo "int ksu_execveat_hook() { return 0; }" >> drivers/ksu_stub.c
+        echo "obj-y += ksu_stub.o" >> drivers/Makefile
+        
+        # 6. Setup Config using system GCC
         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- cactus_defconfig
         
-        # 6. FORCE DISABLE Stack Protector and FORCE ENABLE KernelSU
+        # 7. FORCE DISABLE Stack Protector
         sed -i 's/CONFIG_CC_STACKPROTECTOR_STRONG=y/# CONFIG_CC_STACKPROTECTOR_STRONG is not set/g' out/.config
         echo "CONFIG_CC_STACKPROTECTOR_NONE=y" >> out/.config
-        echo "CONFIG_KSU=y" >> out/.config
         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- olddefconfig
         
-        # 7. Start the actual build with GCC and aggressive warning suppression
+        # 8. Start the actual build with GCC and aggressive warning suppression
         make -j$(nproc --all) O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-error -Wno-array-bounds -Wno-maybe-uninitialized"
 
     - name: Upload Kernel Image
