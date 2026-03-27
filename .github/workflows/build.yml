@@ -18,25 +18,28 @@ jobs:
 
     - name: Patch Typos and Compile Kernel
       run: |
-        # 1. Automatically fix the developer's copy-paste typo
+        # 1. Automatically fix the developer's copy-paste typo in namespace.c
         sed -i 's/+static int can_umount/static int can_umount/g' fs/namespace.c
         
-        # 2. The SAFER Warning Bypass (No more broken flags)
+        # 2. Fix the duplicate 'static' typo in the CPU frequency drivers
+        sed -i 's/static struct cpufreq_governor/struct cpufreq_governor/g' drivers/cpufreq/cpufreq_*.c
+        
+        # 3. The SAFER Warning Bypass
         find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror-/-W/g' {} +
         find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror\b//g' {} +
         
-        # 3. Fix Ubuntu 22.04 compatibility for older kernels
+        # 4. Fix Ubuntu 22.04 compatibility for older kernels
         export HOSTCFLAGS="-fcommon"
         
-        # 4. Setup Config using system GCC
+        # 5. Setup Config using system GCC
         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- cactus_defconfig
         
-        # 5. FORCE DISABLE Stack Protector
+        # 6. FORCE DISABLE Stack Protector
         sed -i 's/CONFIG_CC_STACKPROTECTOR_STRONG=y/# CONFIG_CC_STACKPROTECTOR_STRONG is not set/g' out/.config
         echo "CONFIG_CC_STACKPROTECTOR_NONE=y" >> out/.config
         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- olddefconfig
         
-        # 6. Start the actual build with GCC and aggressive warning suppression
+        # 7. Start the actual build with GCC and aggressive warning suppression
         make -j$(nproc --all) O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-error -Wno-array-bounds -Wno-maybe-uninitialized"
 
     - name: Upload Kernel Image
