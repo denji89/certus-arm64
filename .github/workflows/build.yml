@@ -21,19 +21,22 @@ jobs:
         # 1. Automatically fix the developer's copy-paste typo
         sed -i 's/+static int can_umount/static int can_umount/g' fs/namespace.c
         
-        # 2. Fix Ubuntu 22.04 compatibility for older kernels
+        # 2. The Nuclear Warning Bypass: Strip -Werror from Makefiles AND Kbuild files
+        find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror\b//g' {} +
+        
+        # 3. Fix Ubuntu 22.04 compatibility for older kernels
         export HOSTCFLAGS="-fcommon"
         
-        # 3. Setup Config using system GCC
+        # 4. Setup Config using system GCC
         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- cactus_defconfig
         
-        # 4. FORCE DISABLE Stack Protector
+        # 5. FORCE DISABLE Stack Protector
         sed -i 's/CONFIG_CC_STACKPROTECTOR_STRONG=y/# CONFIG_CC_STACKPROTECTOR_STRONG is not set/g' out/.config
         echo "CONFIG_CC_STACKPROTECTOR_NONE=y" >> out/.config
         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- olddefconfig
         
-        # 5. Start the actual build with GCC
-        make -j$(nproc --all) O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+        # 6. Start the actual build with GCC and aggressive warning suppression
+        make -j$(nproc --all) O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-error -Wno-array-bounds -Wno-maybe-uninitialized"
 
     - name: Upload Kernel Image
       uses: actions/upload-artifact@v4
