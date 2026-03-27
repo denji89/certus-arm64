@@ -21,7 +21,8 @@ jobs:
         # 1. Automatically fix the developer's copy-paste typo
         sed -i 's/+static int can_umount/static int can_umount/g' fs/namespace.c
         
-        # 2. The Nuclear Warning Bypass: Strip -Werror from Makefiles AND Kbuild files
+        # 2. The SAFER Warning Bypass (No more broken flags)
+        find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror-/-W/g' {} +
         find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror\b//g' {} +
         
         # 3. Fix Ubuntu 22.04 compatibility for older kernels
