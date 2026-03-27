@@ -30,9 +30,9 @@ jobs:
         # 2. Tell the compiler to stop treating minor warnings as fatal errors
         find . -name "Makefile" -exec sed -i 's/-Werror\b//g' {} +
         
-        # 3. Start the build (strictly enforcing Clang and warning bypass)
-        make O=out ARCH=arm64 cactus_defconfig
-        make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-error"
+        # 3. Start the build (strictly enforcing Clang on ALL commands)
+        make O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- cactus_defconfig
+        make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu- KCFLAGS="-Wno-error"
 
     - name: Upload Kernel Image
       uses: actions/upload-artifact@v4
