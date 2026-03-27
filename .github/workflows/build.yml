@@ -9,7 +9,7 @@ jobs:
     - name: Checkout Kernel Source
       uses: actions/checkout@v4
       with:
-      submodules: 'recursive'
+        submodules: 'recursive'
 
     - name: Setup Build Environment
       run: |
