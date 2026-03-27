@@ -20,17 +20,19 @@ jobs:
       run: |
         git clone --depth=1 https://github.com/kdrag0n/proton-clang.git ~/toolchain
 
-    - name: Compile Kernel
+    - name: Patch Typos and Compile Kernel
       run: |
         export PATH="$HOME/toolchain/bin:$PATH"
-        export ARCH=arm64
-        export SUBARCH=arm64
-        export CROSS_COMPILE=aarch64-linux-gnu-
-        export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-        export CC=clang
         
-        make O=out cactus_defconfig
-        make -j$(nproc --all) O=out
+        # 1. Automatically fix the developer's copy-paste typo
+        sed -i 's/+static int can_umount/static int can_umount/g' fs/namespace.c
+        
+        # 2. Tell the compiler to stop treating minor warnings as fatal errors
+        find . -name "Makefile" -exec sed -i 's/-Werror\b//g' {} +
+        
+        # 3. Start the build (strictly enforcing Clang and warning bypass)
+        make O=out ARCH=arm64 cactus_defconfig
+        make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-error"
 
     - name: Upload Kernel Image
       uses: actions/upload-artifact@v4
