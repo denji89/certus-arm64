@@ -34,9 +34,10 @@ jobs:
         # 5. Setup Config using system GCC
         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- cactus_defconfig
         
-        # 6. FORCE DISABLE Stack Protector
+        # 6. FORCE DISABLE Stack Protector and FORCE ENABLE KernelSU
         sed -i 's/CONFIG_CC_STACKPROTECTOR_STRONG=y/# CONFIG_CC_STACKPROTECTOR_STRONG is not set/g' out/.config
         echo "CONFIG_CC_STACKPROTECTOR_NONE=y" >> out/.config
+        echo "CONFIG_KSU=y" >> out/.config
         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- olddefconfig
         
         # 7. Start the actual build with GCC and aggressive warning suppression
