@@ -1,4 +1,4 @@
-name: Build Cactus Kernel
+ name: Build Cactus Pentest Kernel
 on:
   workflow_dispatch:
 
@@ -6,56 +6,55 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-    - name: Checkout Kernel Source
-      uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
-
     - name: Setup Build Environment
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential bc bison flex libssl-dev make libc6-dev libncurses-dev device-tree-compiler ccache lz4 lzop zip gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi python3 python-is-python3 python2
+        sudo apt-get install -y git build-essential bc bison flex libssl-dev make libc6-dev libncurses-dev device-tree-compiler ccache lz4 lzop zip gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi python3 python-is-python3
 
-    - name: Patch Typos and Compile Kernel
+    - name: Clone Unbroken Kernel Source
       run: |
-        # 1. Automatically fix the developer's copy-paste typo
-        sed -i 's/+static int can_umount/static int can_umount/g' fs/namespace.c
+        # Pulling the trusted MT6765 community tree for Android 13
+        git clone --depth=1 -b lineage-20 https://github.com/xiaomi-mt6765-devs/android_kernel_xiaomi_mt6765.git kernel
         
-        # 2. Fix the duplicate 'static' typo in the CPU frequency drivers
-        sed -i 's/static struct cpufreq_governor/struct cpufreq_governor/g' drivers/cpufreq/cpufreq_*.c
+    - name: Inject Monitor Mode & RT5370 Drivers
+      run: |
+        cd kernel
         
-        # 3. THE FIX: Bypass Version Magic (Force kernel to accept existing phone Wi-Fi drivers)
-        sed -i 's/return strcmp(amagic, bmagic) == 0;/return 1;/g' kernel/module.c
+        # Inject the exact framework and Ralink drivers needed for Packet Injection
+        cat <<EOF >> arch/arm64/configs/cactus_defconfig
+        CONFIG_WIRELESS=y
+        CONFIG_CFG80211=y
+        CONFIG_MAC80211=y
+        CONFIG_WLAN_VENDOR_RALINK=y
+        CONFIG_RT2X00=y
+        CONFIG_RT2800USB=y
+        CONFIG_RT2800USB_RT53XX=y
+        CONFIG_RT2X00_LIB_USB=y
+        CONFIG_RT2X00_LIB_FIRMWARE=y
+        CONFIG_RT2X00_LIB_CRYPTO=y
+        EOF
         
-        # 4. The SAFER Warning Bypass
+        # Strip strict warnings
         find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror-/-W/g' {} +
         find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror\b//g' {} +
-        
-        # 5. Fix Ubuntu 22.04 compatibility for older kernels
+
+    - name: Compile the Kernel
+      run: |
+        cd kernel
         export HOSTCFLAGS="-fcommon"
         
-        # 6. Create Dummy KSU Hooks
-        echo "int ksu_input_hook() { return 0; }" > drivers/ksu_stub.c
-        echo "int ksu_vfs_read_hook() { return 0; }" >> drivers/ksu_stub.c
-        echo "int ksu_execveat_hook() { return 0; }" >> drivers/ksu_stub.c
-        echo "obj-y += ksu_stub.o" >> drivers/Makefile
-        
-        # 7. Setup Config using system GCC
+        # Setup configuration
         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- cactus_defconfig
         
-        # 8. FORCE DISABLE Stack Protector & Module Security Signatures
-        sed -i 's/CONFIG_CC_STACKPROTECTOR_STRONG=y/# CONFIG_CC_STACKPROTECTOR_STRONG is not set/g' out/.config
-        echo "CONFIG_CC_STACKPROTECTOR_NONE=y" >> out/.config
+        # Disable security module blocking
         sed -i 's/CONFIG_MODULE_SIG=y/# CONFIG_MODULE_SIG is not set/g' out/.config
         sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' out/.config
-        make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- olddefconfig
         
-        # 9. Start the actual build with GCC and aggressive warning suppression
-        make -j$(nproc --all) O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-error -Wno-array-bounds -Wno-maybe-uninitialized"
+        # Start the build
+        make -j$(nproc --all) O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-error"
 
-    - name: Upload Kernel Image
+    - name: Upload Pentest Kernel Image
       uses: actions/upload-artifact@v4
       with:
-        name: Compiled-Kernel-Cactus
-        path: out/arch/arm64/boot/Image.gz-dtb
-        
+        name: Cactus-Pentest-Kernel
+        path: kernel/out/arch/arm64/boot/Image.gz-dtb
