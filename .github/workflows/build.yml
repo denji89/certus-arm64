@@ -14,7 +14,7 @@ jobs:
     - name: Clone Unbroken Kernel Source
       run: |
         # Pulling the trusted MT6765 community tree for Android 13
-        git clone --depth=1 -b lineage-20 https://github.com/xiaomi-mt6765-devs/android_kernel_xiaomi_mt6765.git kernel
+        git clone --depth=1 https://github.com/xiaomi-mt6765-devs/android_kernel_xiaomi_mt6765.git kernel
         
     - name: Inject Monitor Mode & RT5370 Drivers
       run: |
