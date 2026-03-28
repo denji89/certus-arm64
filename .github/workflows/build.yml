@@ -18,44 +18,44 @@ jobs:
 
     - name: Patch Typos and Compile Kernel
       run: |
-        # 1. Automatically fix the developer's copy-paste typo in namespace.c
+        # 1. Automatically fix the developer's copy-paste typo
         sed -i 's/+static int can_umount/static int can_umount/g' fs/namespace.c
         
         # 2. Fix the duplicate 'static' typo in the CPU frequency drivers
         sed -i 's/static struct cpufreq_governor/struct cpufreq_governor/g' drivers/cpufreq/cpufreq_*.c
         
-        # 3. The SAFER Warning Bypass
+        # 3. THE FIX: Bypass Version Magic (Force kernel to accept existing phone Wi-Fi drivers)
+        sed -i 's/return strcmp(amagic, bmagic) == 0;/return 1;/g' kernel/module.c
+        
+        # 4. The SAFER Warning Bypass
         find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror-/-W/g' {} +
         find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror\b//g' {} +
         
-        # 4. Fix Ubuntu 22.04 compatibility for older kernels
+        # 5. Fix Ubuntu 22.04 compatibility for older kernels
         export HOSTCFLAGS="-fcommon"
         
-        # 5. Create Dummy KSU Hooks to satisfy the Linker
+        # 6. Create Dummy KSU Hooks
         echo "int ksu_input_hook() { return 0; }" > drivers/ksu_stub.c
         echo "int ksu_vfs_read_hook() { return 0; }" >> drivers/ksu_stub.c
         echo "int ksu_execveat_hook() { return 0; }" >> drivers/ksu_stub.c
         echo "obj-y += ksu_stub.o" >> drivers/Makefile
         
-        # 6. Setup Config using system GCC
+        # 7. Setup Config using system GCC
         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- cactus_defconfig
         
-        # 7. FORCE DISABLE Stack Protector
+        # 8. FORCE DISABLE Stack Protector & Module Security Signatures
         sed -i 's/CONFIG_CC_STACKPROTECTOR_STRONG=y/# CONFIG_CC_STACKPROTECTOR_STRONG is not set/g' out/.config
         echo "CONFIG_CC_STACKPROTECTOR_NONE=y" >> out/.config
+        sed -i 's/CONFIG_MODULE_SIG=y/# CONFIG_MODULE_SIG is not set/g' out/.config
+        sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' out/.config
         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- olddefconfig
         
-        # 8. Start the actual build with GCC and aggressive warning suppression
+        # 9. Start the actual build with GCC and aggressive warning suppression
         make -j$(nproc --all) O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-error -Wno-array-bounds -Wno-maybe-uninitialized"
-        
-        # 9. GATHER ALL COMPILED MODULES (.ko files)
-        mkdir -p out/compiled_modules
-        find out/ -name "*.ko" -exec cp {} out/compiled_modules/ \;
 
-    - name: Upload Kernel Image and Modules
+    - name: Upload Kernel Image
       uses: actions/upload-artifact@v4
       with:
         name: Compiled-Kernel-Cactus
-        path: |
-          out/arch/arm64/boot/Image.gz-dtb
-          out/compiled_modules/
+        path: out/arch/arm64/boot/Image.gz-dtb
+        
