@@ -1,4 +1,4 @@
- name: Build Cactus Pentest Kernel
+name: Build Certus Pentest Kernel
 on:
   workflow_dispatch:
 
@@ -13,7 +13,7 @@ jobs:
 
     - name: Clone Unbroken Kernel Source
       run: |
-        # Pulling the trusted MT6765 community tree for Android 13
+        # Pulling the trusted MT6765 community tree
         git clone --depth=1 https://github.com/xiaomi-mt6765-devs/android_kernel_xiaomi_mt6765.git kernel
         
     - name: Inject Monitor Mode & RT5370 Drivers
@@ -21,7 +21,7 @@ jobs:
         cd kernel
         
         # Inject the exact framework and Ralink drivers needed for Packet Injection
-        cat <<EOF >> arch/arm64/configs/cactus_defconfig
+        cat <<EOF >> arch/arm64/configs/certus_defconfig
         CONFIG_WIRELESS=y
         CONFIG_CFG80211=y
         CONFIG_MAC80211=y
@@ -36,25 +36,5 @@ jobs:
         
         # Strip strict warnings
         find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror-/-W/g' {} +
-        find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror\b//g' {} +
-
-    - name: Compile the Kernel
-      run: |
-        cd kernel
-        export HOSTCFLAGS="-fcommon"
+        find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -
         
-        # Setup configuration
-        make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- cactus_defconfig
-        
-        # Disable security module blocking
-        sed -i 's/CONFIG_MODULE_SIG=y/# CONFIG_MODULE_SIG is not set/g' out/.config
-        sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' out/.config
-        
-        # Start the build
-        make -j$(nproc --all) O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-error"
-
-    - name: Upload Pentest Kernel Image
-      uses: actions/upload-artifact@v4
-      with:
-        name: Cactus-Pentest-Kernel
-        path: kernel/out/arch/arm64/boot/Image.gz-dtb
