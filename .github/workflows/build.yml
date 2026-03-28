@@ -16,6 +16,11 @@ jobs:
         # Pulling the trusted MT6765 community tree
         git clone --depth=1 https://github.com/xiaomi-mt6765-devs/android_kernel_xiaomi_mt6765.git kernel
         
+    - name: Clone Proton Clang Toolchain
+      run: |
+        # Bringing in the ultimate Android compiler
+        git clone --depth=1 https://github.com/kdrag0n/proton-clang.git clang
+
     - name: Inject Monitor Mode & RT5370 Drivers
       run: |
         cd kernel
@@ -36,5 +41,29 @@ jobs:
         
         # Strip strict warnings
         find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror-/-W/g' {} +
-        find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -
+        find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror\b//g' {} +
+
+    - name: Compile the Kernel
+      run: |
+        cd kernel
+        
+        # Tell the server exactly where Proton-Clang is hiding
+        export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
+        export HOSTCFLAGS="-fcommon"
+        
+        # Setup configuration using Clang
+        make O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- certus_defconfig
+        
+        # Disable security module blocking
+        sed -i 's/CONFIG_MODULE_SIG=y/# CONFIG_MODULE_SIG is not set/g' out/.config
+        sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' out/.config
+        
+        # Start the build using Clang
+        make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-error"
+
+    - name: Upload Pentest Kernel Image
+      uses: actions/upload-artifact@v4
+      with:
+        name: Certus-Pentest-Kernel
+        path: kernel/out/arch/arm64/boot/Image.gz-dtb
         
