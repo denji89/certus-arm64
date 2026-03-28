@@ -18,7 +18,7 @@ jobs:
 
     - name: Patch Typos and Compile Kernel
       run: |
-        # 1. Automatically fix the developer's copy-paste typo
+        # 1. Automatically fix the developer's copy-paste typo in namespace.c
         sed -i 's/+static int can_umount/static int can_umount/g' fs/namespace.c
         
         # 2. Fix the duplicate 'static' typo in the CPU frequency drivers
@@ -31,7 +31,7 @@ jobs:
         # 4. Fix Ubuntu 22.04 compatibility for older kernels
         export HOSTCFLAGS="-fcommon"
         
-        # 5. Create Dummy KSU Hooks to satisfy the Linker (The Bypass)
+        # 5. Create Dummy KSU Hooks to satisfy the Linker
         echo "int ksu_input_hook() { return 0; }" > drivers/ksu_stub.c
         echo "int ksu_vfs_read_hook() { return 0; }" >> drivers/ksu_stub.c
         echo "int ksu_execveat_hook() { return 0; }" >> drivers/ksu_stub.c
@@ -47,9 +47,15 @@ jobs:
         
         # 8. Start the actual build with GCC and aggressive warning suppression
         make -j$(nproc --all) O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-error -Wno-array-bounds -Wno-maybe-uninitialized"
+        
+        # 9. GATHER ALL COMPILED MODULES (.ko files)
+        mkdir -p out/compiled_modules
+        find out/ -name "*.ko" -exec cp {} out/compiled_modules/ \;
 
-    - name: Upload Kernel Image
+    - name: Upload Kernel Image and Modules
       uses: actions/upload-artifact@v4
       with:
         name: Compiled-Kernel-Cactus
-        path: out/arch/arm64/boot/Image.gz-dtb
+        path: |
+          out/arch/arm64/boot/Image.gz-dtb
+          out/compiled_modules/
