@@ -35,8 +35,14 @@ jobs:
         
         # Fix sloppy function order in the Energy Aware Scheduler
         sed -i '1i struct task_struct;\nint find_best_idle_cpu(struct task_struct *p, bool prefer_idle);' kernel/sched/eas_plus.c
+
+        # NEW: Snipe missing MediaTek headers that cause fatal errors
+        mkdir -p drivers/misc/mediatek/include/mt-plat/
+        touch drivers/misc/mediatek/include/mt-plat/mt_om_api.h
+        mkdir -p drivers/misc/mediatek/eccci/
+        touch drivers/misc/mediatek/eccci/ccci_config.h
         
-        # The Ultimate Linker Bypass (Stub missing proprietary functions)
+        # The Ultimate Linker Bypass
         echo "void aee_save_excp_regs(void) {}" > lib/dummy_mtk.c
         echo "int arch_scale_freq_capacity(void *a, int b) { return 0; }" >> lib/dummy_mtk.c
         echo "void aee_stop_nested_panic(void) {}" >> lib/dummy_mtk.c
@@ -70,15 +76,12 @@ jobs:
         export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
         export HOSTCFLAGS="-fcommon"
         
-        # 1. Dynamically find the real configuration file
         DEF_TARGET=$(cd arch/arm64/configs && find . -type f -name "*defconfig" | grep -iE "certus|cactus|mt6765" | head -n 1 | sed 's|^\./||')
         if [ -z "$DEF_TARGET" ]; then DEF_TARGET="defconfig"; fi
-        echo "Found Real Defconfig: $DEF_TARGET"
         
-        # Generate the true, full base config FIRST
         make O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- $DEF_TARGET
         
-        # 2. Forcefully inject Monitor Mode, RT5370 Drivers, and Disable KVM using bulletproof echo
+        # Inject Pentest Configs
         echo "CONFIG_WIRELESS=y" >> out/.config
         echo "CONFIG_CFG80211=y" >> out/.config
         echo "CONFIG_MAC80211=y" >> out/.config
@@ -89,16 +92,12 @@ jobs:
         echo "CONFIG_RT2X00_LIB_USB=y" >> out/.config
         echo "CONFIG_RT2X00_LIB_FIRMWARE=y" >> out/.config
         echo "CONFIG_RT2X00_LIB_CRYPTO=y" >> out/.config
-        echo "CONFIG_CGROUPS=y" >> out/.config
-        echo "CONFIG_CGROUP_SCHED=y" >> out/.config
-        echo "CONFIG_RT_GROUP_SCHED=y" >> out/.config
         
-        # 3. Disable strict module checking & broken KVM Virtualization
-        sed -i 's/CONFIG_MODULE_SIG=y/# CONFIG_MODULE_SIG is not set/g' out/.config
-        sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' out/.config
+        # Disable broken MTK drivers that killed the last build
+        sed -i 's/CONFIG_MTK_MEMINFO=y/# CONFIG_MTK_MEMINFO is not set/g' out/.config
+        sed -i 's/CONFIG_MTK_CCCI_DEVS=y/# CONFIG_MTK_CCCI_DEVS is not set/g' out/.config
         sed -i 's/CONFIG_KVM=y/# CONFIG_KVM is not set/g' out/.config
         
-        # 4. Lock in the new settings safely
         make O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- olddefconfig
 
     - name: Compile the Kernel
@@ -106,8 +105,6 @@ jobs:
         cd kernel
         export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
         export HOSTCFLAGS="-fcommon"
-        
-        # Start the final build
         make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb KCFLAGS="-Wno-error -fno-builtin"
 
     - name: Upload Pentest Kernel Image
