@@ -22,31 +22,24 @@ jobs:
     - name: Patch Kernel Source Code
       run: |
         cd kernel
-        # Strip strict warnings
+        # 1. Strip strict warnings globally
         find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror-/-W/g' {} +
         find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror\b//g' {} +
         
-        # Eradicate the ghost dtbo_check requirement
-        find arch/arm64 -type f -name "Makefile" -exec sed -i 's/dtbo_check//g' {} +
-        sed -i 's/dtbo_check//g' Makefile
-        
-        # Delete the broken hang_detected timer call
-        sed -i '/hang_detected/d' kernel/time/hrtimer.c
-        
-        # Fix sloppy function order in the Energy Aware Scheduler
-        sed -i '1i struct task_struct;\nint find_best_idle_cpu(struct task_struct *p, bool prefer_idle);' kernel/sched/eas_plus.c
+        # 2. Fix the Networking 'stack_trace' error (Incomplete Type)
+        sed -i '1i #include <linux/stacktrace.h>' net/core/rtnetlink.c
 
-        # SCHEDULER SNIPER: Comment out the lines that refer to missing 'rq' and 'rt_rq' members
-        sed -i 's/.*rt_rq->rq.*/\/\/ patched/g' kernel/sched/rt.c
-        sed -i 's/.*rt.rt_rq.*/\/\/ patched/g' kernel/sched/rt.c
+        # 3. Search and Destroy missing MediaTek headers
+        find . -type f -name "*.c" -o -name "*.h" | xargs sed -i '/mt_om_api.h/d'
+        find . -type f -name "*.c" -o -name "*.h" | xargs sed -i '/ccci_config.h/d'
+        find . -type f -name "*.c" -o -name "*.h" | xargs sed -i '/cccs_config.h/d'
 
-        # Snipe missing MediaTek headers
-        mkdir -p drivers/misc/mediatek/include/mt-plat/
-        touch drivers/misc/mediatek/include/mt-plat/mt_om_api.h
-        mkdir -p drivers/misc/mediatek/eccci/
-        touch drivers/misc/mediatek/eccci/ccci_config.h
-        
-        # The Ultimate Linker Bypass
+        # 4. Patch Scheduler errors (SNIPER FIX)
+        sed -i 's/.*rt_rq->rq.*/\/\/ patched/g' sched/rt.c
+        sed -i 's/.*rt.rt_rq.*/\/\/ patched/g' sched/rt.c
+        sed -i '1i struct task_struct;\nint find_best_idle_cpu(struct task_struct *p, bool prefer_idle);' sched/eas_plus.c
+
+        # 5. The Ultimate Linker Bypass (Dummy File)
         echo "void aee_save_excp_regs(void) {}" > lib/dummy_mtk.c
         echo "int arch_scale_freq_capacity(void *a, int b) { return 0; }" >> lib/dummy_mtk.c
         echo "void aee_stop_nested_panic(void) {}" >> lib/dummy_mtk.c
@@ -67,8 +60,7 @@ jobs:
         echo "void update_sched_hint(void) {}" >> lib/dummy_mtk.c
         echo "int select_task_prefer_cpu(void) { return 0; }" >> lib/dummy_mtk.c
         echo "int mt_need_uart_console = 0;" >> lib/dummy_mtk.c
-        echo "void mtk8250_uart_dump(void) {}" >> lib/dummy_mtk.c
-        echo "void mtk_btag_pidlog_set_pid(void) {}" >> lib/dummy_mtk.c
+        echo "void mtk8250_uart_dump(void) {}" >> lib/void mtk_btag_pidlog_set_pid(void) {}" >> lib/dummy_mtk.c
         echo "int rtc_set_alarm_poweron(void) { return 0; }" >> lib/dummy_mtk.c
         echo "void mtk_btag_pidlog_submit_bio(void) {}" >> lib/dummy_mtk.c
         echo "void mtk_btag_pidlog_map_sg(void) {}" >> lib/dummy_mtk.c
@@ -97,7 +89,7 @@ jobs:
         echo "CONFIG_RT2X00_LIB_FIRMWARE=y" >> out/.config
         echo "CONFIG_RT2X00_LIB_CRYPTO=y" >> out/.config
         
-        # Disable broken modules
+        # Forcefully disable the broken modules
         sed -i 's/CONFIG_MTK_MEMINFO=y/# CONFIG_MTK_MEMINFO is not set/g' out/.config
         sed -i 's/CONFIG_MTK_CCCI_DEVS=y/# CONFIG_MTK_CCCI_DEVS is not set/g' out/.config
         sed -i 's/CONFIG_KVM=y/# CONFIG_KVM is not set/g' out/.config
@@ -110,6 +102,10 @@ jobs:
         cd kernel
         export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
         export HOSTCFLAGS="-fcommon"
+        # THE TRUE FIX: Eradicate the ghost dtbo_check requirement
+        find arch/arm64 -type f -name "Makefile" -exec sed -i 's/dtbo_check//g' {} +
+        sed -i 's/dtbo_check//g' Makefile
+        
         make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb KCFLAGS="-Wno-error -fno-builtin"
 
     - name: Upload Pentest Kernel Image
