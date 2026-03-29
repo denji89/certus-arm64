@@ -21,11 +21,11 @@ jobs:
         # Bringing in the ultimate Android compiler
         git clone --depth=1 https://github.com/kdrag0n/proton-clang.git clang
 
-    - name: Inject Monitor Mode & RT5370 Drivers
+    - name: Inject Monitor Mode, RT5370 Drivers & Missing Configs
       run: |
         cd kernel
         
-        # Inject the exact framework and Ralink drivers needed for Packet Injection
+        # Inject the exact framework, Ralink drivers, and MISSING SCHEDULER VARS
         cat <<EOF >> arch/arm64/configs/certus_defconfig
         CONFIG_WIRELESS=y
         CONFIG_CFG80211=y
@@ -37,6 +37,9 @@ jobs:
         CONFIG_RT2X00_LIB_USB=y
         CONFIG_RT2X00_LIB_FIRMWARE=y
         CONFIG_RT2X00_LIB_CRYPTO=y
+        CONFIG_CGROUPS=y
+        CONFIG_CGROUP_SCHED=y
+        CONFIG_RT_GROUP_SCHED=y
         EOF
         
         # Strip strict warnings
@@ -61,13 +64,13 @@ jobs:
         sed -i 's/dtbo_check//g' Makefile
         
         # FIX 1: Patch the broken MediaTek Scheduler variable
-        sed -i '1i #ifndef NOHZ_BALANCE_KICK\n#define NOHZ_BALANCE_KICK 0\nstatic unsigned long _dummy_nohz = 0;\n#define nohz_flags(cpu) (&_dummy_nohz)\n#endif' kernel/sched/core.c
+        sed -i '1i #ifndef NOHZ_BALANCE_KICK\n#define NOHZ_BALANCE_KICK 0\nstatic unsigned long _dummy_nohz = 0;\n#define nohz_flags(cpu) (&_dummy_nohz)\n#endif' sched/core.c
         
-        # NEW FIX 2: Delete the broken hang_detected timer call
-        sed -i '/hang_detected/d' kernel/time/hrtimer.c
+        # FIX 2: Delete the broken hang_detected timer call
+        sed -i '/hang_detected/d' time/hrtimer.c
         
-        # NEW FIX 3: Fix sloppy function order in the Energy Aware Scheduler
-        sed -i '1i struct task_struct;\nint find_best_idle_cpu(struct task_struct *p, bool prefer_idle);' kernel/sched/eas_plus.c
+        # FIX 3: Fix sloppy function order in the Energy Aware Scheduler
+        sed -i '1i struct task_struct;\nint find_best_idle_cpu(struct task_struct *p, bool prefer_idle);' sched/eas_plus.c
         
         # Start the build using Clang
         make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb KCFLAGS="-Wno-error"
