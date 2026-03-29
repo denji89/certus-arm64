@@ -25,22 +25,20 @@ jobs:
       run: |
         cd kernel
         
-        # Inject the exact framework, Ralink drivers, and MISSING SCHEDULER VARS
-        cat <<EOF >> arch/arm64/configs/certus_defconfig
-        CONFIG_WIRELESS=y
-        CONFIG_CFG80211=y
-        CONFIG_MAC80211=y
-        CONFIG_WLAN_VENDOR_RALINK=y
-        CONFIG_RT2X00=y
-        CONFIG_RT2800USB=y
-        CONFIG_RT2800USB_RT53XX=y
-        CONFIG_RT2X00_LIB_USB=y
-        CONFIG_RT2X00_LIB_FIRMWARE=y
-        CONFIG_RT2X00_LIB_CRYPTO=y
-        CONFIG_CGROUPS=y
-        CONFIG_CGROUP_SCHED=y
-        CONFIG_RT_GROUP_SCHED=y
-        EOF
+        # Inject the exact framework, Ralink drivers, and MISSING SCHEDULER VARS using bulletproof echo
+        echo "CONFIG_WIRELESS=y" >> arch/arm64/configs/certus_defconfig
+        echo "CONFIG_CFG80211=y" >> arch/arm64/configs/certus_defconfig
+        echo "CONFIG_MAC80211=y" >> arch/arm64/configs/certus_defconfig
+        echo "CONFIG_WLAN_VENDOR_RALINK=y" >> arch/arm64/configs/certus_defconfig
+        echo "CONFIG_RT2X00=y" >> arch/arm64/configs/certus_defconfig
+        echo "CONFIG_RT2800USB=y" >> arch/arm64/configs/certus_defconfig
+        echo "CONFIG_RT2800USB_RT53XX=y" >> arch/arm64/configs/certus_defconfig
+        echo "CONFIG_RT2X00_LIB_USB=y" >> arch/arm64/configs/certus_defconfig
+        echo "CONFIG_RT2X00_LIB_FIRMWARE=y" >> arch/arm64/configs/certus_defconfig
+        echo "CONFIG_RT2X00_LIB_CRYPTO=y" >> arch/arm64/configs/certus_defconfig
+        echo "CONFIG_CGROUPS=y" >> arch/arm64/configs/certus_defconfig
+        echo "CONFIG_CGROUP_SCHED=y" >> arch/arm64/configs/certus_defconfig
+        echo "CONFIG_RT_GROUP_SCHED=y" >> arch/arm64/configs/certus_defconfig
         
         # Strip strict warnings
         find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror-/-W/g' {} +
@@ -63,31 +61,48 @@ jobs:
         find arch/arm64 -type f -name "Makefile" -exec sed -i 's/dtbo_check//g' {} +
         sed -i 's/dtbo_check//g' Makefile
         
-        # RESTORED FIX 1: Patch the broken MediaTek Scheduler variable
+        # FIX 1: Patch the broken MediaTek Scheduler variable
         sed -i '1i #ifndef NOHZ_BALANCE_KICK\n#define NOHZ_BALANCE_KICK 0\nstatic unsigned long _dummy_nohz = 0;\n#define nohz_flags(cpu) (&_dummy_nohz)\n#endif' kernel/sched/core.c
         
-        # RESTORED FIX 2: Delete the broken hang_detected timer call
+        # FIX 2: Delete the broken hang_detected timer call
         sed -i '/hang_detected/d' kernel/time/hrtimer.c
         
-        # RESTORED FIX 3: Fix sloppy function order in the Energy Aware Scheduler
+        # FIX 3: Fix sloppy function order in the Energy Aware Scheduler
         sed -i '1i struct task_struct;\nint find_best_idle_cpu(struct task_struct *p, bool prefer_idle);' kernel/sched/eas_plus.c
         
-        # FIX 4: The Ultimate Linker Bypass (Stub missing proprietary functions)
-        cat <<EOF > lib/dummy_mtk.c
-        void aee_save_excp_regs(void) {}
-        int arch_scale_freq_capacity(void *a, int b) { return 0; }
-        void aee_stop_nested_panic(void) {}
-        int memory_ssmr_inited = 0;
-        int is_zmc_inited(void) { return 0; }
-        unsigned long zmc_max_zone_dma_phys = 0;
-        void zmc_get_range(void) {}
-        void _mt_irq_set_polarity(int irq, int pol) {}
-        char *stpcpy(char *dest, const char *src) { while ((*dest++ = *src++)); return dest - 1; }
-        int bcmp(const void *s1, const void *s2, unsigned long n) { const unsigned char *p1 = s1, *p2 = s2; while (n-- > 0) if (*p1++ != *p2++) return 1; return 0; }
-        void nohz_balance_clear_nohz_mask(void) {}
-        void remove_cpu_from_prefer_schedule_domain(void) {}
-        void add_cpu_to_prefer_schedule_domain(void) {}
-        int task_prefer_fit(void) { return 0; }
-        int check_freq_turning(void) { return 0; }
-        int stune_task_threshold = 0;
-        int upower_get_turn_point(void) { return
+        # FIX 4: The Ultimate Linker Bypass (Bulletproof Echo Method)
+        echo "void aee_save_excp_regs(void) {}" > lib/dummy_mtk.c
+        echo "int arch_scale_freq_capacity(void *a, int b) { return 0; }" >> lib/dummy_mtk.c
+        echo "void aee_stop_nested_panic(void) {}" >> lib/dummy_mtk.c
+        echo "int memory_ssmr_inited = 0;" >> lib/dummy_mtk.c
+        echo "int is_zmc_inited(void) { return 0; }" >> lib/dummy_mtk.c
+        echo "unsigned long zmc_max_zone_dma_phys = 0;" >> lib/dummy_mtk.c
+        echo "void zmc_get_range(void) {}" >> lib/dummy_mtk.c
+        echo "void _mt_irq_set_polarity(int irq, int pol) {}" >> lib/dummy_mtk.c
+        echo "char *stpcpy(char *dest, const char *src) { while ((*dest++ = *src++)); return dest - 1; }" >> lib/dummy_mtk.c
+        echo "int bcmp(const void *s1, const void *s2, unsigned long n) { const unsigned char *p1 = s1, *p2 = s2; while (n-- > 0) if (*p1++ != *p2++) return 1; return 0; }" >> lib/dummy_mtk.c
+        echo "void nohz_balance_clear_nohz_mask(void) {}" >> lib/dummy_mtk.c
+        echo "void remove_cpu_from_prefer_schedule_domain(void) {}" >> lib/dummy_mtk.c
+        echo "void add_cpu_to_prefer_schedule_domain(void) {}" >> lib/dummy_mtk.c
+        echo "int task_prefer_fit(void) { return 0; }" >> lib/dummy_mtk.c
+        echo "int check_freq_turning(void) { return 0; }" >> lib/dummy_mtk.c
+        echo "int stune_task_threshold = 0;" >> lib/dummy_mtk.c
+        echo "int upower_get_turn_point(void) { return 0; }" >> lib/dummy_mtk.c
+        echo "void update_sched_hint(void) {}" >> lib/dummy_mtk.c
+        echo "int select_task_prefer_cpu(void) { return 0; }" >> lib/dummy_mtk.c
+        echo "int mt_need_uart_console = 0;" >> lib/dummy_mtk.c
+        echo "void mtk8250_uart_dump(void) {}" >> lib/dummy_mtk.c
+        echo "void mtk_btag_pidlog_set_pid(void) {}" >> lib/dummy_mtk.c
+        echo "int rtc_set_alarm_poweron(void) { return 0; }" >> lib/dummy_mtk.c
+        echo "void mtk_btag_pidlog_submit_bio(void) {}" >> lib/dummy_mtk.c
+        echo "void mtk_btag_pidlog_map_sg(void) {}" >> lib/dummy_mtk.c
+        echo "obj-y += dummy_mtk.o" >> lib/Makefile
+        
+        # Start the build using Clang
+        make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb KCFLAGS="-Wno-error -fno-builtin"
+
+    - name: Upload Pentest Kernel Image
+      uses: actions/upload-artifact@v4
+      with:
+        name: Certus-Pentest-Kernel
+        path: kernel/out/arch/arm64/boot/Image.gz-dtb
