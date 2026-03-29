@@ -21,53 +21,54 @@ jobs:
 
     - name: Patch Kernel Source Code
       run: |
-        cd kernel
-        # 1. Strip strict warnings globally
-        find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror-/-W/g' {} +
-        find . -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror\b//g' {} +
-        
-        # 2. Fix Networking errors (Incomplete Type)
-        find net/core/ -name "rtnetlink.c" -exec sed -i '1i #include <linux/stacktrace.h>' {} +
+        # 1. Fix the Networking 'stack_trace' error (Incomplete Type)
+        sed -i '1i #include <linux/stacktrace.h>' kernel/net/core/rtnetlink.c
 
-        # 3. Wipe out references to missing MediaTek headers (The Ghost Killers)
-        find . -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i '/mt_om_api.h/d' {} +
-        find . -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i '/ccci_config.h/d' {} +
-        find . -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i '/cccs_config.h/d' {} +
+        # 2. Create Dummy Headers for MediaTek (Stops the 'file not found' errors)
+        mkdir -p kernel/drivers/misc/mediatek/include/mt-plat/
+        touch kernel/drivers/misc/mediatek/include/mt-plat/mt_om_api.h
+        mkdir -p kernel/drivers/misc/mediatek/eccci/
+        touch kernel/drivers/misc/mediatek/eccci/ccci_config.h
+        touch kernel/drivers/misc/mediatek/eccci/cccs_config.h
 
-        # 4. Patch Scheduler errors (Search and Destroy)
-        find kernel/sched/ -name "rt.c" -exec sed -i 's/.*rt_rq->rq.*/\/\/ patched/g' {} +
-        find kernel/sched/ -name "rt.c" -exec sed -i 's/.*rt.rt_rq.*/\/\/ patched/g' {} +
-        find kernel/sched/ -name "eas_plus.c" -exec sed -i '1i struct task_struct;\nint find_best_idle_cpu(struct task_struct *p, bool prefer_idle);' {} +
-        find kernel/time/ -name "hrtimer.c" -exec sed -i '/hang_detected/d' {} +
+        # 3. Patch Scheduler errors (Using Absolute Paths)
+        sed -i 's/.*rt_rq->rq.*/\/\/ patched/g' kernel/kernel/sched/rt.c
+        sed -i 's/.*rt.rt_rq.*/\/\/ patched/g' kernel/kernel/sched/rt.c
+        sed -i '1i struct task_struct;\nint find_best_idle_cpu(struct task_struct *p, bool prefer_idle);' kernel/kernel/sched/eas_plus.c
+        sed -i '/hang_detected/d' kernel/kernel/time/hrtimer.c
 
-        # 5. The Ultimate Linker Bypass (Clean Dummy File)
-        mkdir -p lib
-        echo "void aee_save_excp_regs(void) {}" > lib/dummy_mtk.c
-        echo "int arch_scale_freq_capacity(void *a, int b) { return 0; }" >> lib/dummy_mtk.c
-        echo "void aee_stop_nested_panic(void) {}" >> lib/dummy_mtk.c
-        echo "int memory_ssmr_inited = 0;" >> lib/dummy_mtk.c
-        echo "int is_zmc_inited(void) { return 0; }" >> lib/dummy_mtk.c
-        echo "unsigned long zmc_max_zone_dma_phys = 0;" >> lib/dummy_mtk.c
-        echo "void zmc_get_range(void) {}" >> lib/dummy_mtk.c
-        echo "void _mt_irq_set_polarity(int irq, int pol) {}" >> lib/dummy_mtk.c
-        echo "char *stpcpy(char *dest, const char *src) { while ((*dest++ = *src++)); return dest - 1; }" >> lib/dummy_mtk.c
-        echo "int bcmp(const void *s1, const void *s2, unsigned long n) { const unsigned char *p1 = s1, *p2 = s2; while (n-- > 0) if (*p1++ != *p2++) return 1; return 0; }" >> lib/dummy_mtk.c
-        echo "void nohz_balance_clear_nohz_mask(void) {}" >> lib/dummy_mtk.c
-        echo "void remove_cpu_from_prefer_schedule_domain(void) {}" >> lib/dummy_mtk.c
-        echo "void add_cpu_to_prefer_schedule_domain(void) {}" >> lib/dummy_mtk.c
-        echo "int task_prefer_fit(void) { return 0; }" >> lib/dummy_mtk.c
-        echo "int check_freq_turning(void) { return 0; }" >> lib/dummy_mtk.c
-        echo "int stune_task_threshold = 0;" >> lib/dummy_mtk.c
-        echo "int upower_get_turn_point(void) { return 0; }" >> lib/dummy_mtk.c
-        echo "void update_sched_hint(void) {}" >> lib/dummy_mtk.c
-        echo "int select_task_prefer_cpu(void) { return 0; }" >> lib/dummy_mtk.c
-        echo "int mt_need_uart_console = 0;" >> lib/dummy_mtk.c
-        echo "void mtk8250_uart_dump(void) {}" >> lib/dummy_mtk.c
-        echo "void mtk_btag_pidlog_set_pid(void) {}" >> lib/dummy_mtk.c
-        echo "int rtc_set_alarm_poweron(void) { return 0; }" >> lib/dummy_mtk.c
-        echo "void mtk_btag_pidlog_submit_bio(void) {}" >> lib/dummy_mtk.c
-        echo "void mtk_btag_pidlog_map_sg(void) {}" >> lib/dummy_mtk.c
-        echo "obj-y += dummy_mtk.o" >> lib/Makefile
+        # 4. Strip strict warnings globally
+        find kernel -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror-/-W/g' {} +
+        find kernel -type f \( -name "Makefile" -o -name "Kbuild" \) -exec sed -i 's/-Werror\b//g' {} +
+
+        # 5. The Ultimate Linker Bypass (Dummy File)
+        mkdir -p kernel/lib
+        echo "void aee_save_excp_regs(void) {}" > kernel/lib/dummy_mtk.c
+        echo "int arch_scale_freq_capacity(void *a, int b) { return 0; }" >> kernel/lib/dummy_mtk.c
+        echo "void aee_stop_nested_panic(void) {}" >> kernel/lib/dummy_mtk.c
+        echo "int memory_ssmr_inited = 0;" >> kernel/lib/dummy_mtk.c
+        echo "int is_zmc_inited(void) { return 0; }" >> kernel/lib/dummy_mtk.c
+        echo "unsigned long zmc_max_zone_dma_phys = 0;" >> kernel/lib/dummy_mtk.c
+        echo "void zmc_get_range(void) {}" >> kernel/lib/dummy_mtk.c
+        echo "void _mt_irq_set_polarity(int irq, int pol) {}" >> kernel/lib/dummy_mtk.c
+        echo "char *stpcpy(char *dest, const char *src) { while ((*dest++ = *src++)); return dest - 1; }" >> kernel/lib/dummy_mtk.c
+        echo "int bcmp(const void *s1, const void *s2, unsigned long n) { const unsigned char *p1 = s1, *p2 = s2; while (n-- > 0) if (*p1++ != *p2++) return 1; return 0; }" >> kernel/lib/dummy_mtk.c
+        echo "void nohz_balance_clear_nohz_mask(void) {}" >> kernel/lib/dummy_mtk.c
+        echo "void remove_cpu_from_prefer_schedule_domain(void) {}" >> kernel/lib/dummy_mtk.c
+        echo "void add_cpu_to_prefer_schedule_domain(void) {}" >> kernel/lib/dummy_mtk.c
+        echo "int task_prefer_fit(void) { return 0; }" >> kernel/lib/dummy_mtk.c
+        echo "int check_freq_turning(void) { return 0; }" >> kernel/lib/dummy_mtk.c
+        echo "int stune_task_threshold = 0;" >> kernel/lib/dummy_mtk.c
+        echo "int upower_get_turn_point(void) { return 0; }" >> kernel/lib/dummy_mtk.c
+        echo "void update_sched_hint(void) {}" >> kernel/lib/dummy_mtk.c
+        echo "int select_task_prefer_cpu(void) { return 0; }" >> kernel/lib/dummy_mtk.c
+        echo "int mt_need_uart_console = 0;" >> kernel/lib/dummy_mtk.c
+        echo "void mtk8250_uart_dump(void) {}" >> kernel/lib/dummy_mtk.c
+        echo "void mtk_btag_pidlog_set_pid(void) {}" >> kernel/lib/dummy_mtk.c
+        echo "int rtc_set_alarm_poweron(void) { return 0; }" >> kernel/lib/dummy_mtk.c
+        echo "void mtk_btag_pidlog_submit_bio(void) {}" >> kernel/lib/dummy_mtk.c
+        echo "void mtk_btag_pidlog_map_sg(void) {}" >> kernel/lib/dummy_mtk.c
+        echo "obj-y += dummy_mtk.o" >> kernel/lib/Makefile
 
     - name: Configure the Kernel
       run: |
@@ -92,7 +93,7 @@ jobs:
         echo "CONFIG_RT2X00_LIB_FIRMWARE=y" >> out/.config
         echo "CONFIG_RT2X00_LIB_CRYPTO=y" >> out/.config
         
-        # Forcefully disable the broken modules
+        # Disable broken modules
         sed -i 's/CONFIG_MTK_MEMINFO=y/# CONFIG_MTK_MEMINFO is not set/g' out/.config
         sed -i 's/CONFIG_MTK_CCCI_DEVS=y/# CONFIG_MTK_CCCI_DEVS is not set/g' out/.config
         sed -i 's/CONFIG_KVM=y/# CONFIG_KVM is not set/g' out/.config
