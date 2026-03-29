@@ -60,8 +60,14 @@ jobs:
         find arch/arm64 -type f -name "Makefile" -exec sed -i 's/dtbo_check//g' {} +
         sed -i 's/dtbo_check//g' Makefile
         
-        # NEW FIX: Patch the broken MediaTek Scheduler code for Clang
+        # FIX 1: Patch the broken MediaTek Scheduler variable
         sed -i '1i #ifndef NOHZ_BALANCE_KICK\n#define NOHZ_BALANCE_KICK 0\nstatic unsigned long _dummy_nohz = 0;\n#define nohz_flags(cpu) (&_dummy_nohz)\n#endif' kernel/sched/core.c
+        
+        # NEW FIX 2: Delete the broken hang_detected timer call
+        sed -i '/hang_detected/d' kernel/time/hrtimer.c
+        
+        # NEW FIX 3: Fix sloppy function order in the Energy Aware Scheduler
+        sed -i '1i struct task_struct;\nint find_best_idle_cpu(struct task_struct *p, bool prefer_idle);' kernel/sched/eas_plus.c
         
         # Start the build using Clang
         make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb KCFLAGS="-Wno-error"
