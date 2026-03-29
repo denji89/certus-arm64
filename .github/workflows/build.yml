@@ -46,8 +46,6 @@ jobs:
     - name: Compile the Kernel
       run: |
         cd kernel
-        
-        # Tell the server exactly where Proton-Clang is hiding
         export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
         export HOSTCFLAGS="-fcommon"
         
@@ -58,12 +56,14 @@ jobs:
         sed -i 's/CONFIG_MODULE_SIG=y/# CONFIG_MODULE_SIG is not set/g' out/.config
         sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' out/.config
         
+        # THE FIX: Eradicate the ghost dtbo_check requirement from all device tree makefiles
+        find arch/arm64/boot/dts -type f -name "Makefile" -exec sed -i 's/dtbo_check//g' {} +
+        
         # Start the build using Clang
-          make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb KCFLAGS="-Wno-error"
+        make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb KCFLAGS="-Wno-error"
 
     - name: Upload Pentest Kernel Image
       uses: actions/upload-artifact@v4
       with:
         name: Certus-Pentest-Kernel
         path: kernel/out/arch/arm64/boot/Image.gz-dtb
-        
