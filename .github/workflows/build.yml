@@ -73,8 +73,13 @@ jobs:
         export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
         export HOSTCFLAGS="-fcommon"
         
-        # 1. Generate the true, full Xiaomi Certus configuration FIRST
-        make O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- certus_defconfig
+        # 1. Dynamically find the real configuration file (bypasses Xiaomi's folder tricks)
+        DEF_TARGET=$(cd arch/arm64/configs && find . -type f -name "*defconfig" | grep -iE "certus|cactus|mt6765" | head -n 1 | sed 's|^\./||')
+        if [ -z "$DEF_TARGET" ]; then DEF_TARGET="defconfig"; fi
+        echo "Found Real Defconfig: $DEF_TARGET"
+        
+        # Generate the true, full base config FIRST
+        make O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- $DEF_TARGET
         
         # 2. Forcefully inject Monitor Mode & RT5370 Drivers directly into the generated .config
         cat <<EOF >> out/.config
