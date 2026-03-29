@@ -56,8 +56,9 @@ jobs:
         sed -i 's/CONFIG_MODULE_SIG=y/# CONFIG_MODULE_SIG is not set/g' out/.config
         sed -i 's/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/g' out/.config
         
-        # THE FIX: Eradicate the ghost dtbo_check requirement from all device tree makefiles
-        find arch/arm64/boot/dts -type f -name "Makefile" -exec sed -i 's/dtbo_check//g' {} +
+        # THE TRUE FIX: Eradicate the ghost dtbo_check requirement
+        find arch/arm64 -type f -name "Makefile" -exec sed -i 's/dtbo_check//g' {} +
+        sed -i 's/dtbo_check//g' Makefile
         
         # Start the build using Clang
         make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb KCFLAGS="-Wno-error"
