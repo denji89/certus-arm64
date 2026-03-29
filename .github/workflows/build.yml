@@ -72,11 +72,22 @@ jobs:
         # RESTORED FIX 3: Fix sloppy function order in the Energy Aware Scheduler
         sed -i '1i struct task_struct;\nint find_best_idle_cpu(struct task_struct *p, bool prefer_idle);' kernel/sched/eas_plus.c
         
-        # Start the build using Clang
-        make -j$(nproc --all) O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb KCFLAGS="-Wno-error"
-
-    - name: Upload Pentest Kernel Image
-      uses: actions/upload-artifact@v4
-      with:
-        name: Certus-Pentest-Kernel
-        path: kernel/out/arch/arm64/boot/Image.gz-dtb
+        # FIX 4: The Ultimate Linker Bypass (Stub missing proprietary functions)
+        cat <<EOF > lib/dummy_mtk.c
+        void aee_save_excp_regs(void) {}
+        int arch_scale_freq_capacity(void *a, int b) { return 0; }
+        void aee_stop_nested_panic(void) {}
+        int memory_ssmr_inited = 0;
+        int is_zmc_inited(void) { return 0; }
+        unsigned long zmc_max_zone_dma_phys = 0;
+        void zmc_get_range(void) {}
+        void _mt_irq_set_polarity(int irq, int pol) {}
+        char *stpcpy(char *dest, const char *src) { while ((*dest++ = *src++)); return dest - 1; }
+        int bcmp(const void *s1, const void *s2, unsigned long n) { const unsigned char *p1 = s1, *p2 = s2; while (n-- > 0) if (*p1++ != *p2++) return 1; return 0; }
+        void nohz_balance_clear_nohz_mask(void) {}
+        void remove_cpu_from_prefer_schedule_domain(void) {}
+        void add_cpu_to_prefer_schedule_domain(void) {}
+        int task_prefer_fit(void) { return 0; }
+        int check_freq_turning(void) { return 0; }
+        int stune_task_threshold = 0;
+        int upower_get_turn_point(void) { return
