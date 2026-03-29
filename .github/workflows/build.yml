@@ -36,7 +36,11 @@ jobs:
         # Fix sloppy function order in the Energy Aware Scheduler
         sed -i '1i struct task_struct;\nint find_best_idle_cpu(struct task_struct *p, bool prefer_idle);' kernel/sched/eas_plus.c
 
-        # NEW: Snipe missing MediaTek headers that cause fatal errors
+        # SCHEDULER SNIPER: Comment out the lines that refer to missing 'rq' and 'rt_rq' members
+        sed -i 's/.*rt_rq->rq.*/\/\/ patched/g' kernel/sched/rt.c
+        sed -i 's/.*rt.rt_rq.*/\/\/ patched/g' kernel/sched/rt.c
+
+        # Snipe missing MediaTek headers
         mkdir -p drivers/misc/mediatek/include/mt-plat/
         touch drivers/misc/mediatek/include/mt-plat/mt_om_api.h
         mkdir -p drivers/misc/mediatek/eccci/
@@ -93,10 +97,11 @@ jobs:
         echo "CONFIG_RT2X00_LIB_FIRMWARE=y" >> out/.config
         echo "CONFIG_RT2X00_LIB_CRYPTO=y" >> out/.config
         
-        # Disable broken MTK drivers that killed the last build
+        # Disable broken modules
         sed -i 's/CONFIG_MTK_MEMINFO=y/# CONFIG_MTK_MEMINFO is not set/g' out/.config
         sed -i 's/CONFIG_MTK_CCCI_DEVS=y/# CONFIG_MTK_CCCI_DEVS is not set/g' out/.config
         sed -i 's/CONFIG_KVM=y/# CONFIG_KVM is not set/g' out/.config
+        sed -i 's/CONFIG_RT_GROUP_SCHED=y/# CONFIG_RT_GROUP_SCHED is not set/g' out/.config
         
         make O=out ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- olddefconfig
 
